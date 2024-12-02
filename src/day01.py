@@ -27,9 +27,9 @@ def get_similarity(arr1, arr2):
     counts = {}
     total_score = 0
     for i in arr1:
-        if i not in scores:
-            scores[i] = len([j for j in arr2 if j == i])
-        total_score += scores[i] * i
+        if i not in counts:
+            counts[i] = len([j for j in arr2 if j == i])
+        total_score += counts[i] * i
     return total_score
 
 def main(input):
