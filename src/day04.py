@@ -62,15 +62,6 @@ def count_x_of_mas(input):
                 count += detect_x_of_mas(input,x,y)
     return count
 
-def input_info(input):
-    counts = {}
-    for line in input:
-        if len(line) not in counts:
-            counts[len(line)] = 1
-        else:
-            counts[len(line)] +=1
-    return counts
-
 def main(input):
     print(input_info(input))
     print(check_for_word_start(input, "XMAS"))
