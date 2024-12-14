@@ -15,7 +15,9 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
-        devShells.default = pkgs.mkShell { packages = [ pkgs.python3 ]; };
+        devShells.default = pkgs.mkShell { packages = [
+        (pkgs.python3.withPackages (ps: [ ps.numpy ]))
+        ]; };
       }
     );
 }
