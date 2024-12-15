@@ -1,11 +1,10 @@
-# i gave up on part 2
+# after a revision and rewrite, it is now almost correct. unfortunate.
+# i learned a lot however.
+# i cant really isolate where the issue is here.
 
 
+import collections
 
-
-# move the pointer character, leaving X behind until
-# moving would place on top of collision. then rotate clockwise 90 degrees
-# and continue until moving would place out of bounds.
 
 def process_input(input):
     output = []
@@ -15,167 +14,141 @@ def process_input(input):
             output[i].append(char)
     return output
 
+Point = collections.namedtuple("Point", [ "x", "y"])
+PointDirectionPair = collections.namedtuple("PointDirectionPair", ["point", "direction"])
+
 transition_rule = {"^":">",
               ">":"v",
               "v":"<",
               "<":"^"
               }
 movement_rule = {
-            "^": [0,-1],
-            ">": [1,0],
-            "v": [0,1],
-            "<": [-1,0]
+            "^": Point(0,-1),
+            ">": Point(1,0),
+            "v": Point(0,1),
+            "<": Point(-1,0)
             }
+
+
+def is_point_in_bounds(point, board):
+    x = point.x in range(0,len(board[0]))
+    y = point.y in range(0,len(board))
+    return x and y
+
+def generate_board_graph(board):
+    map = {}
+    for y in range(0,len(board)):
+        for x in range(0,len(board[0])):
+            for direction in movement_rule.keys():
+                map[PointDirectionPair(Point(x,y), direction)] = None
+    for point_direction in map.keys():
+        point = point_direction.point
+        direction = point_direction.direction
+        offset = movement_rule[direction]
+        next_point = Point(point.x + offset.x, point.y + offset.y)
+        if is_point_in_bounds(next_point, board):
+            if board[next_point.y][next_point.x] == "#":
+                direction = transition_rule[direction]
+                offset = movement_rule[direction]
+                next_point = Point(point.x + offset.x, point.y + offset.y)
+                map[point_direction] = PointDirectionPair(next_point, direction)
+            else:
+                map[point_direction] = PointDirectionPair(next_point, direction)
+    return map
+
+
 
 def find_guard(input):
     for y in range(0,len(input)):
         for x in range(0,len(input[0])):
             if input[y][x] in transition_rule:
-                return [x,y]
+                return Point(x,y)
     return None
 
-def move_guard(board, pointer):
-    x = pointer[0]
-    y = pointer[1]
-    offset = movement_rule[board[y][x]]
-    dx = offset[0]
-    dy = offset[1]
-
-
-    is_in_bounds = 0 <= x + dx <= len(board[0])-1 and 0 <= y+dy <= len(board)-1
-    if is_in_bounds and board[y+dy][x+dx] == "#":
-        board[y][x] = transition_rule[board[y][x]]
-        return (board, pointer)
-
-    if not is_in_bounds:
-        board[y][x] = "X"
-        return (board, pointer)
-
-    board[y+dy][x+dx] = board[y][x]
-    pointer = [x+dx,y+dy]
-    board[y][x] = "X"
-    return (board, pointer)
-
-def part1(input):
-    pointer = find_guard(input)
-    board = input
-    while pointer != None:
-        move_guard(input, pointer)
-        pointer = find_guard(input)
-
-    sum = 0
-    for row in board:
-        for char in row:
-            if char == "X":
-                sum += 1
-    return sum
-
-# for every place in the sim loop, scan ahead for an obstacle based on the offset
-# rules. if succeeds, rotate and scan again. after third, see if ends up in initial
-# position, then there is a loop
-def check_for_loop_case1(iboard, pointer, state):
-    # scan ahead.
-    initial = pointer
-    x0 = initial[0]
-    y0 = initial[1]
-    offset = movement_rule[state]
-    board = iboard
-
-    i = 1
+def walk_path(graph, starting_point):
+    starting = PointDirectionPair(starting_point, "^")
+    pointer = starting
+    visited = [starting]
     while True:
-        scan_results = scan_for_obstacle(board, pointer, state)
-        if scan_results == None:
-            return False
-        new_pointer = scan_results[1]
-        state = scan_results[2]
-        offset = movement_rule[state]
-        print(f"{initial}, {pointer}, {new_pointer}")
-        print_board(board)
-        if i >= 4:
-            in_range_x = pointer[0] <= x0 <= new_pointer[0] or pointer[0] >= x0 >= new_pointer[0]
-            in_range_y = pointer[1] <= y0 <= new_pointer[1] or pointer[1] >= y0 >= new_pointer[1]
-            if in_range_y and in_range_x:
-                return True
-        pointer = new_pointer
-        i += 1
-    return False
+        if pointer == None or pointer.point == None:
+            break
+        if pointer not in visited:
+            visited.append(pointer)
+        pointer = graph[pointer]
+        #print(graph[pointer])
+    return visited
 
-def check_for_loop_case2(board, pointer, state):
-    # scan ahead.
-    initial = pointer
-    x0 = initial[0]
-    y0 = initial[1]
-    state = transition_rule[state]
-    offset = movement_rule[state]
-
-    i = 1
-    while True:
-        scan_results = scan_for_obstacle(board, pointer, state)
-        if scan_results == None:
-            return False
-        new_pointer = scan_results[1]
-        state = scan_results[2]
-        offset = movement_rule[state]
-        print(f"{initial}, {pointer}, {new_pointer}")
-        print_board(board)
-        if i == 4:
-            in_range_x = pointer[0] <= x0 <= new_pointer[0] or pointer[0] >= x0 >= new_pointer[0]
-            in_range_y = pointer[1] <= y0 <= new_pointer[1] or pointer[1] >= y0 >= new_pointer[1]
-            if in_range_y and in_range_x:
-                return True
-        pointer = new_pointer
-        i += 1
-    return False
-
-
-
-def scan_for_obstacle(board, initial, state): 
-    x = initial[0]
-    y = initial[1]
-    offset = movement_rule[state]
-    dx = offset[0]
-    dy = offset[1]
-    pointer = [x+dx,y+dy]
-    step_is_in_bounds = (0 <= pointer[1]+dy <= len(board[0])-1) and (0 <= pointer[0]+dx <= len(board)-1)
-
-    loop = True
-    while loop:
-        if step_is_in_bounds:
-            if board[pointer[1]+dy][pointer[0]+dx] != "#":
-                board[pointer[1]][pointer[0]] = "X" #clear me
-                pointer = [pointer[0]+dx, pointer[1]+dy]
-                board[pointer[1]][pointer[0]] = "X" #clear me
-                step_is_in_bounds = (0 <= pointer[1]+dy <= len(board[0])-1) and (0 <= pointer[0]+dx <= len(board)-1)
-            elif board[pointer[1]+dy][pointer[0]+dx] == "#":
-                loop = False
-        else:
-            loop = False
-
-    return (board, pointer, transition_rule[state])
-
-    
-def part2(input):
-    pointer = find_guard(input)
-    board = input
-    sum = 0
-
-    while pointer != None:
-        print_board(board)
-        if check_for_loop(board, pointer, board[pointer[1]][pointer[0]]):
-            sum += 1
-        move_guard(input, pointer)
-        pointer = find_guard(input)
-        print(f"pointer at {pointer}")
-    return sum
-
-def print_board(board):
+def print_board(board, visited):
+    for pointd in visited:
+        point = pointd.point
+        board[point.y][point.x] = "X"
+    #print(visited)
     print("---------------")
     for i in board:
         print(i)
     print("---------------")
 
+def add_barrier_to_graph(graph, point):
+    old_keys = {}
+    for incoming in graph.keys():
+        if graph[incoming] != None:
+            if point == graph[incoming].point:
+                old_keys[incoming] = graph[incoming]
+                direction = transition_rule[incoming.direction]
+                offset = movement_rule[direction]
+                next_point = Point(incoming.point.x + offset.x, incoming.point.y + offset.y)
+                graph[incoming] = PointDirectionPair(next_point, direction)
+    return old_keys
+
+def walk_path_seeking_loop(graph, starting, visited):
+    pointer = starting
+    while True:
+        if visited[pointer] == False:
+            visited[pointer] = True
+        pointer = graph[pointer]
+        if pointer == None or pointer.point == None:
+            break
+        if visited[pointer] != False:
+            return True
+    return False
+
+def part1(input):
+    board = process_input(input)
+    graph = generate_board_graph(board)
+    visited = walk_path(graph,find_guard(board))
+    points = list(set([i.point for i in visited]))
+    return len(points)
+
+def part2(input):
+    board = process_input(input)
+    graph = generate_board_graph(board)
+    starting_point = find_guard(board)
+    print("finding initial path")
+    visited = walk_path(graph,starting_point)
+    print("path found")
+    sum = 0
+    index = 0
+    visited_map = {}
+    for i in graph:
+        visited_map[i] = False
+    for y in range(0, len(board)):
+        for x in range(0, len(board[0])):
+            index +=1
+            point = Point(x, y)
+            print(f"loop entered, entry {index} of {len(board) * len(board[0])}")
+            oldkeys = add_barrier_to_graph(graph, point)
+            print("barrier added")
+            print(f"scanning at {point}")
+            if walk_path_seeking_loop(graph, PointDirectionPair(starting_point,"^"), visited_map):
+                sum += 1
+                print("loop found")
+            graph.update(oldkeys)
+            for j in graph:
+                visited_map[j] = False
+    return sum
+
 
 def main(input):
-    board = process_input(input)
-    print(part1(board))
+    #print(part1(input))
+    print(part2(input))
     pass
