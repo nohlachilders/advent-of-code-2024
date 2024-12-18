@@ -38,7 +38,7 @@ def find_score(x,y,positions):
             quadrant_scores[2] += 1
         elif i[0] > midpoint[0] and i[1] > midpoint[1]:
             quadrant_scores[3] += 1
-    print(quadrant_scores)
+    #print(quadrant_scores)
     return np.prod(np.array(quadrant_scores))
 
 
